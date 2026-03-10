@@ -1,0 +1,29 @@
+llm:
+  api_base: "http://localhost:8000/v1"
+  model: "LGAI-EXAONE/EXAONE-4.0-32B-FP8"
+  temperature: 0.1
+  enable_thinking: true
+  max_retries: 3
+
+sandbox:
+  timeout: 120
+  allowed_imports:
+    - pandas
+    - numpy
+    - scipy
+    - h5py
+    - openpyxl
+    - json
+    - pickle
+
+agent:
+  max_tool_steps: 20
+  confidence_threshold: 0.7
+  fallback_to_tool_use: true
+
+cache:
+  enabled: true
+  db_path: ".bds_cache/cache.db"
+
+export:
+  format: "cellrecord"

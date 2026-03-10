@@ -1,0 +1,40 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+*.egg
+dist/
+build/
+
+# Virtual environments
+.venv/
+venv/
+
+# Data (large files)
+data_raw
+data_raw/
+test_output/
+*.pkl
+
+# Cache
+.bds_cache/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# pytest
+.pytest_cache/
+
+# uv
+uv.lock
+
+# Temp files
+*.tmp
+bds_exec_*.py
