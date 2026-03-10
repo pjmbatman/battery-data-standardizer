@@ -1,104 +1,103 @@
 # Battery Data Standardizer (BDS)
 
-AI 기반 이기종 배터리 데이터 자동 표준화 도구.
+An AI-powered tool for automatically standardizing heterogeneous battery data files.
 
-LLM(EXAONE)이 **어떤 파일 포맷이든** 구조를 스스로 파악하고, 필드명을 이해해서 스키마에 매핑하고, 추출 코드를 직접 생성·실행하여 데이터를 변환합니다. 하드코딩된 파서 없이, 새 데이터셋도 코드 작성 없이 표준화할 수 있습니다.
+An LLM (EXAONE) autonomously analyzes any file format, understands field semantics, maps them to a target schema, and generates extraction code on the fly — no hardcoded parsers required. Add a new dataset without writing a single line of code.
 
-## 아키텍처
+## Architecture
 
 ```
-Input (어떤 파일이든)
+Input (any file format)
     │
     ▼
-[File Inspector] ─── 파일 구조를 텍스트 프리뷰로 변환
+[File Inspector] ─── Converts file structure into a text preview
     │
     ▼
-[LLM Agent] ─── EXAONE이 구조를 보고 판단
-    │   ├─ 1차: 추출 코드 생성 & 실행 (Code Generation)
-    │   └─ 폴백: Tool Use로 반복 탐색 & 추출
+[LLM Agent] ─── EXAONE analyzes the structure and decides how to extract
+    │   ├─ Primary: Code Generation & Execution
+    │   └─ Fallback: Iterative Tool Use (inspect, read, extract)
     │
     ▼
-[Sandbox Executor] ─── 생성된 코드를 안전하게 실행
+[Sandbox Executor] ─── Safely executes generated code in subprocess
     │
     ▼
-[Validator & Exporter] ─── 결과 검증 → CellRecord pickle 출력
+[Validator & Exporter] ─── Validates output → CellRecord pickle
 ```
 
-## 지원 포맷
+## Supported Formats
 
-| 포맷 | 확장자 | 비고 |
-|------|--------|------|
-| CSV/TSV | `.csv`, `.tsv`, `.txt` | 자동 구분자 감지 |
-| Excel | `.xlsx`, `.xls` | 멀티시트 지원 |
+| Format | Extensions | Notes |
+|--------|-----------|-------|
+| CSV/TSV | `.csv`, `.tsv`, `.txt` | Auto delimiter detection |
+| Excel | `.xlsx`, `.xls` | Multi-sheet support |
 | MATLAB v5 | `.mat` | scipy.io.loadmat |
-| MATLAB v7.3 | `.mat` | HDF5 (h5py) |
-| HDF5 | `.h5`, `.hdf5` | 계층 구조 탐색 |
-| JSON | `.json` | 중첩 구조 지원 |
-| Pickle | `.pkl`, `.pickle` | Python 객체 |
-| ZIP/TAR/GZ | `.zip`, `.tar.gz` 등 | 자동 해제 후 처리 |
+| MATLAB v7.3 | `.mat` | HDF5 via h5py |
+| HDF5 | `.h5`, `.hdf5` | Hierarchical structure traversal |
+| JSON | `.json` | Nested structure support |
+| Pickle | `.pkl`, `.pickle` | Python objects |
+| Archives | `.zip`, `.tar.gz`, etc. | Auto-extraction before processing |
 
-## 출력
+## Output
 
-[BatteryFoundationFramework](https://github.com/pjmbatman/BatteryFoundationFramework)의 `CellRecord` 호환 pickle 파일로 출력됩니다.
+Outputs [BatteryFoundationFramework](https://github.com/pjmbatman/BatteryFoundationFramework)-compatible `CellRecord` pickle files.
 
 ```python
-# BFF에서 바로 사용 가능
 from pipeline.standardizer.cell_record import CellRecord
 cell = CellRecord.load("output/B0025.pkl")
 ```
 
-## 빠른 시작
+## Quick Start
 
-### 1. 설치
+### 1. Installation
 
 ```bash
-# uv 설치 (없는 경우)
+# Install uv (if not already installed)
 curl -LsSf https://astral.sh/uv/install.sh | sh
 
-# 프로젝트 클론 & 의존성 설치
+# Clone & install dependencies
 git clone https://github.com/pjmbatman/battery-data-standardizer.git
 cd battery-data-standardizer
 uv venv
 uv pip install -e ".[dev]"
 ```
 
-### 2. LLM 서버 실행
+### 2. Start the LLM Server
 
-vLLM으로 EXAONE 모델을 서빙합니다. GPU 서버에서 실행하세요.
+Serve the EXAONE model via vLLM. Run this on a GPU machine.
 
 ```bash
-# 기본 모델 (EXAONE-4.0-32B-FP8, ~34GB VRAM)
+# Default model (EXAONE-4.0-32B-FP8, ~34GB VRAM)
 bash scripts/serve_model.sh
 
-# 또는 다른 모델 지정
+# Or specify a different model
 MODEL=LGAI-EXAONE/EXAONE-3.5-7.8B-Instruct bash scripts/serve_model.sh
 
-# 서버 상태 확인
+# Verify the server is running
 curl http://localhost:8000/v1/models
 ```
 
-> 모델이 없으면 자동으로 다운로드됩니다. 처음 실행 시 시간이 걸릴 수 있습니다.
+> The model will be downloaded automatically on first run. This may take some time.
 
-### 3. 데이터 표준화
+### 3. Standardize Data
 
 ```bash
-# 파일 하나 표준화
+# Standardize a single file
 uv run bds standardize ./data/sample.csv -o ./output/
 
-# 디렉토리 전체 표준화 (배치 모드)
+# Batch mode (entire directory, no interactive prompts)
 uv run bds standardize ./raw_data/ -o ./standardized/ --batch
 
-# 다른 vLLM 서버 사용
+# Use a remote vLLM server
 uv run bds standardize ./data/ -o ./output/ --api-base http://gpu-server:8000/v1
 ```
 
-### 4. 파일 구조 미리보기 (LLM 호출 없이)
+### 4. Inspect File Structure (no LLM calls)
 
 ```bash
 uv run bds inspect ./data/B0025.mat
 ```
 
-출력 예시:
+Example output:
 ```
 [MAT v5, 2,753,821 bytes]
 B0025: structured array, shape=(1, 1), fields=['cycle']
@@ -109,34 +108,34 @@ Types: {'impedance': 21, 'charge': 31, 'discharge': 28}
 ...
 ```
 
-### 5. 캐시 관리
+### 5. Cache Management
 
-같은 구조의 파일은 LLM 호출 없이 캐시된 코드를 재활용합니다.
+Files with the same structure reuse cached extraction code without calling the LLM.
 
 ```bash
-# 캐시 목록 조회
+# List cached entries
 uv run bds cache list
 
-# 캐시 초기화
+# Clear all cache
 uv run bds cache clear
 ```
 
-## 설정
+## Configuration
 
-`configs/default.yaml`에서 설정을 변경할 수 있습니다.
+Edit `configs/default.yaml`:
 
 ```yaml
 llm:
-  api_base: "http://localhost:8000/v1"   # vLLM 서버 주소
+  api_base: "http://localhost:8000/v1"
   model: "LGAI-EXAONE/EXAONE-4.0-32B-FP8"
   temperature: 0.1
-  max_retries: 3          # 코드 생성 재시도 횟수
+  max_retries: 3
 
 sandbox:
-  timeout: 120            # 코드 실행 타임아웃 (초)
+  timeout: 120
 
 agent:
-  max_tool_steps: 20      # Tool Use 모드 최대 스텝
+  max_tool_steps: 20
   fallback_to_tool_use: true
 
 cache:
@@ -144,65 +143,65 @@ cache:
   db_path: ".bds_cache/cache.db"
 ```
 
-## 동작 원리
+## How It Works
 
-1. **File Inspector**: 파일을 텍스트 프리뷰로 변환 (구조, 필드명, 샘플 데이터)
-2. **Code Generation Agent (1차)**: LLM이 프리뷰를 보고 완전한 추출 Python 스크립트를 생성
-3. **Sandbox Execution**: 생성된 코드를 subprocess로 실행, JSON 출력을 파싱
-4. **Validation**: 전압 범위(0~6V), 시간 단조증가, 배열 길이 일관성 등 검증
-5. **Auto-retry**: 실행 오류 또는 검증 실패 시 에러를 LLM에게 보여주고 코드 수정 (최대 3회)
-6. **Tool Use Agent (폴백)**: 코드 생성 실패 시, LLM이 도구(inspect, read_sample, extract, execute_code, profile)를 사용하여 단계적 탐색·추출
-7. **Cache**: 성공한 추출 코드를 파일 구조 시그니처(헤더 해시 등)로 캐싱 → 같은 구조의 다른 파일에 재활용
+1. **File Inspector**: Converts any file into a text preview (structure, field names, sample data)
+2. **Code Generation Agent**: LLM reads the preview and generates a complete Python extraction script
+3. **Sandbox Execution**: The generated script runs in a subprocess; JSON output is parsed from stdout
+4. **Validation**: Checks voltage range (0–6V), time monotonicity, array length consistency, etc.
+5. **Auto-retry**: On execution errors or validation failures, the error is fed back to the LLM for code correction (up to 3 retries)
+6. **Tool Use Agent (fallback)**: If code generation fails, the LLM iteratively uses tools (inspect, read_sample, extract, execute_code, profile) to explore and extract data step by step
+7. **Caching**: Successful extraction code is cached by file structure signature (e.g., header hash) and reused for files with the same structure
 
-## 테스트
+## Testing
 
 ```bash
 uv run python -m pytest tests/
 ```
 
-## 프로젝트 구조
+## Project Structure
 
 ```
 battery-data-standardizer/
-├── configs/default.yaml          # 설정
+├── configs/default.yaml
 ├── scripts/
-│   ├── serve_model.sh            # vLLM 서빙 스크립트
-│   └── download_model.py         # 모델 다운로드
+│   ├── serve_model.sh          # vLLM serving script
+│   └── download_model.py       # Model downloader
 ├── src/bds/
-│   ├── cli.py                    # CLI (standardize, inspect, cache)
-│   ├── config.py                 # 설정 로드
-│   ├── pipeline.py               # 전체 파이프라인
+│   ├── cli.py                  # CLI (standardize, inspect, cache)
+│   ├── config.py               # Config loader
+│   ├── pipeline.py             # End-to-end pipeline
 │   ├── inspector/
-│   │   ├── preview.py            # 파일 구조 프리뷰
-│   │   └── archive.py            # 아카이브 해제
+│   │   ├── preview.py          # File structure preview
+│   │   └── archive.py          # Archive extraction
 │   ├── agent/
-│   │   ├── orchestrator.py       # Agent 오케스트레이터
-│   │   ├── code_generator.py     # 코드 생성 Agent
-│   │   ├── tool_use.py           # Tool Use Agent (폴백)
-│   │   ├── tools.py              # Tool 정의
-│   │   ├── prompts.py            # 프롬프트 템플릿
-│   │   └── llm_client.py         # vLLM 클라이언트
+│   │   ├── orchestrator.py     # Agent orchestrator
+│   │   ├── code_generator.py   # Code generation agent
+│   │   ├── tool_use.py         # Tool use agent (fallback)
+│   │   ├── tools.py            # Tool definitions
+│   │   ├── prompts.py          # Prompt templates
+│   │   └── llm_client.py       # vLLM OpenAI-compatible client
 │   ├── sandbox/
-│   │   └── executor.py           # 코드 실행 환경
-│   ├── schema.py                 # CellRecord/CycleRecord 스키마
-│   ├── validator.py              # 출력 데이터 검증
-│   ├── exporter.py               # pickle 출력
-│   └── cache.py                  # SQLite 캐시
-└── tests/                        # 유닛 테스트 (38개)
+│   │   └── executor.py         # Sandboxed code execution
+│   ├── schema.py               # CellRecord / CycleRecord schema
+│   ├── validator.py            # Output data validation
+│   ├── exporter.py             # Pickle exporter
+│   └── cache.py                # SQLite cache
+└── tests/                      # Unit tests (38 tests)
 ```
 
-## 검증 결과
+## Validation Results
 
-| 데이터셋 | 포맷 | 사이클 수 | 성공 시도 |
-|---------|------|----------|----------|
-| SNL | CSV | 388 | 1차 |
-| CALCE | XLSX | 7 | 1차 |
-| UL-PUR | CSV | 205 | 1차 |
-| HNEI | CSV (45MB) | 1101 | 캐시 |
-| NASA | MAT v5 | 59 | 2차 |
+| Dataset | Format | Cycles | Attempt |
+|---------|--------|--------|---------|
+| SNL | CSV | 388 | 1st |
+| CALCE | XLSX | 7 | 1st |
+| UL-PUR | CSV | 205 | 1st |
+| HNEI | CSV (45MB) | 1,101 | Cached |
+| NASA | MAT v5 | 59 | 2nd |
 
-## 요구 사항
+## Requirements
 
 - Python >= 3.10
-- GPU 서버 (vLLM 서빙용, EXAONE-4.0-32B-FP8 기준 ~34GB VRAM)
-- [uv](https://github.com/astral-sh/uv) (패키지 관리)
+- GPU server for vLLM (~34GB VRAM for EXAONE-4.0-32B-FP8)
+- [uv](https://github.com/astral-sh/uv) for package management
